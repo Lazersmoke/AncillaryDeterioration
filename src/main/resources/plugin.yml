@@ -1,0 +1,11 @@
+name: ${project.name}
+main: com.github.lazersmoke.AncillaryDeterioration.AncillaryDeteriorationPlugin
+author: Lazersmoke
+version: ${project.version}
+depend: [CivModCore]
+commands:
+    ancillaryrot:
+        permission: ancillarydeterioration.public
+permissions:
+    ancillarydeterioration.public:
+        default: true
