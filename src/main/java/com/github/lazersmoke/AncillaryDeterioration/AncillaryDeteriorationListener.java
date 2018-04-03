@@ -15,8 +15,10 @@ import org.bukkit.event.inventory.BrewEvent;
 import org.bukkit.event.inventory.BrewingStandFuelEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.Inventory;
@@ -61,12 +63,25 @@ public final class AncillaryDeteriorationListener implements Listener{
   public void onItemSpawn(ItemSpawnEvent e){
     Item item = e.getEntity();
     ItemStack i = item.getItemStack();
-    timestampIt(i);
+    if(timestampIt(i)){
+      item.setItemStack(i);
+    }
   }
 
   @EventHandler
   public void onClick(InventoryClickEvent e){
-    timestampIt(e.getCurrentItem());
+    ItemStack c = e.getCurrentItem();
+    if(timestampIt(c)){
+      e.setCurrentItem(c);
+    }
+    timestampIt(e.getCursor());
+    final Inventory clickerInv = e.getWhoClicked().getInventory();
+    if(e.getAction() == InventoryAction.HOTBAR_SWAP || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD){
+      ItemStack h = clickerInv.getItem(e.getHotbarButton());
+      if(timestampIt(h)){
+        clickerInv.setItem(e.getHotbarButton(),h);
+      }
+    }
   }
 
   @EventHandler
@@ -123,18 +138,92 @@ public final class AncillaryDeteriorationListener implements Listener{
 
   @EventHandler(ignoreCancelled=true)
   public void onBreak(BlockBreakEvent e){
-    LocalDate stamp = AncillaryDeteriorationPlugin.getDAO().getStamp(e.getBlock().getLocation());
+    e.setDropItems(!handleBlockDestroyed(e.getBlock(),e.getPlayer().getInventory().getItemInMainHand()));
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onBreak(BlockPhysicsEvent e){
+    Material m = e.getBlock().getType();
+    switch(m){
+      case ACACIA_DOOR:
+      case ACTIVATOR_RAIL:
+      case BEETROOT_BLOCK:
+      case BIRCH_DOOR:
+      case BROWN_MUSHROOM:
+      case CACTUS:
+      case CARPET:
+      case CARROT:
+      case CHORUS_FLOWER:
+      case CHORUS_FRUIT:
+      case CHORUS_FRUIT_POPPED:
+      case CHORUS_PLANT:
+      case COCOA:
+      case CROPS:
+      case DARK_OAK_DOOR:
+      case DEAD_BUSH:
+      case DETECTOR_RAIL:
+      case DIODE_BLOCK_ON:
+      case DIODE_BLOCK_OFF:
+      case DOUBLE_PLANT:
+      case DRAGON_EGG:
+      case FLOWER_POT:
+      case JUNGLE_DOOR:
+      case LADDER:
+      case LEVER:
+      case LONG_GRASS:
+      case MELON_STEM:
+      case NETHER_WARTS:
+      case POTATO:
+      case POWERED_RAIL:
+      case PUMPKIN_STEM:
+      case RAILS:
+      case RED_MUSHROOM:
+      case RED_ROSE:
+      case REDSTONE_COMPARATOR_OFF:
+      case REDSTONE_COMPARATOR_ON:
+      case REDSTONE_TORCH_OFF:
+      case REDSTONE_TORCH_ON:
+      case REDSTONE_WIRE:
+      case SAND:
+      case SAPLING:
+      case SIGN_POST:
+      case SKULL:
+      case SNOW:
+      case SPRUCE_DOOR:
+      case STANDING_BANNER:
+      case STONE_BUTTON:
+      case STONE_PLATE:
+      case SUGAR_CANE_BLOCK:
+      case TORCH:
+      case TRIPWIRE_HOOK:
+      case VINE:
+      case WALL_BANNER:
+      case WALL_SIGN:
+      case WOOD_BUTTON:
+      case WOOD_PLATE:
+      case YELLOW_FLOWER:
+        handleBlockDestroyed(e.getBlock());
+    }
+  }
+
+  public static boolean handleBlockDestroyed(Block b){
+    return handleBlockDestroyed(b,null);
+  }
+
+  public static boolean handleBlockDestroyed(Block b, ItemStack tool){
+    LocalDate stamp = AncillaryDeteriorationPlugin.getDAO().getStamp(b.getLocation());
     if(stamp != null){
-      AncillaryDeteriorationPlugin.getDAO().forgetStamp(e.getBlock().getLocation());
-      e.setDropItems(false);
-      Collection<ItemStack> defaultDrops = e.getBlock().getDrops(e.getPlayer().getInventory().getItemInMainHand());
+      AncillaryDeteriorationPlugin.getDAO().forgetStamp(b.getLocation());
+      Collection<ItemStack> defaultDrops = tool == null ? b.getDrops() : b.getDrops(tool);
       defaultDrops.stream().forEach(i -> {
         if(needsTimestamp(i)){
           addSpecificTimestamp(i,stamp);
         }
-        e.getBlock().getWorld().dropItemNaturally(e.getBlock().getLocation().add(0.5,0.5,0.5),i);
+        b.getWorld().dropItemNaturally(b.getLocation().add(0.5,0.5,0.5),i);
       });
+      return true;
     }
+    return false;
   }
 
   public static void fixCraftingInventory(CraftingInventory craft){
